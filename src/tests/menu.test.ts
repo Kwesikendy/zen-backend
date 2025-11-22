@@ -59,7 +59,7 @@ describe('Menu Management', () => {
         expect(res.body.title).toBe('Lunch Menu');
     });
 
-    it('should add an item to menu', async () => {
+    it('should add an item to menu with options', async () => {
         const menu = await prisma.menu.create({
             data: {
                 title: 'Dinner Menu',
@@ -74,11 +74,17 @@ describe('Menu Management', () => {
                 menuId: menu.id,
                 name: 'Burger',
                 price: 15.99,
-                qty: 100
+                qty: 100,
+                options: [
+                    { name: 'Cheese', price: 2.00 },
+                    { name: 'Bacon', price: 3.00 }
+                ]
             });
 
         expect(res.status).toBe(201);
         expect(res.body.name).toBe('Burger');
+        expect(res.body.options).toHaveLength(2);
+        expect(res.body.options[0].name).toBe('Cheese');
     });
 
     it('should get restaurant menus with items', async () => {

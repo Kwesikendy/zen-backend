@@ -7,48 +7,63 @@ const prisma = new PrismaClient();
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
     try {
-        const validatedData = createOrderSchema.parse(req.body);
-        // userId is optional now (for kiosks/vendors)
-        const userId = req.user?.userId;
+        // 1. Validate Input
+        const { restaurantId, items, customerName, tableNumber } = createOrderSchema.parse(req.body);
+        const userId = req.user?.userId || null; // Optional for Kiosk/Vendor
 
-        // 1. Fetch all menu items to get real prices
-        const itemIds = validatedData.items.map(i => i.menuItemId);
-        const dbItems = await prisma.menuItem.findMany({
-            where: { id: { in: itemIds } },
+        // 2. Fetch all Menu Items to get prices
+        const menuItemIds = items.map(i => i.menuItemId);
+        const menuItems = await prisma.menuItem.findMany({
+            where: { id: { in: menuItemIds } },
+            include: { options: true } // Include options to validate prices
         });
 
-        // 2. Validate all items exist
-        if (dbItems.length !== itemIds.length) {
-            return res.status(400).json({ error: 'One or more items not found' });
-        }
-
-        // 3. Calculate total and prepare order items data
+        // 3. Calculate Total and Prepare Order Items
         let total = 0;
-        const orderItemsData = validatedData.items.map(item => {
-            const dbItem = dbItems.find(i => i.id === item.menuItemId)!;
-            const itemTotal = dbItem.price * item.qty;
-            total += itemTotal;
-            return {
-                name: dbItem.name,
-                price: dbItem.price,
+        const orderItemsData = [];
+
+        for (const item of items) {
+            const menuItem = menuItems.find(m => m.id === item.menuItemId);
+            if (!menuItem) throw new Error(`Menu item ${item.menuItemId} not found`);
+
+            let itemPrice = Number(menuItem.price);
+            const selectedOptions = [];
+
+            // Handle Options
+            if (item.options && item.options.length > 0) {
+                for (const optionId of item.options) {
+                    const option = menuItem.options.find(o => o.id === optionId);
+                    if (option) {
+                        itemPrice += Number(option.price);
+                        selectedOptions.push({ name: option.name, price: Number(option.price) });
+                    }
+                }
+            }
+
+            total += itemPrice * item.qty;
+
+            orderItemsData.push({
+                menuItemId: item.menuItemId,
                 qty: item.qty,
-            };
-        });
+                price: itemPrice, // Price per unit including options
+                selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined
+            });
+        }
 
         // 4. Create Order
         const order = await prisma.order.create({
             data: {
-                userId: userId || null, // Explicitly allow null
-                restaurantId: validatedData.restaurantId,
-                customerName: validatedData.customerName,
-                tableNumber: validatedData.tableNumber,
+                restaurantId,
+                userId,
+                customerName,
+                tableNumber,
                 total,
                 status: 'PENDING',
                 items: {
-                    create: orderItemsData,
-                },
+                    create: orderItemsData
+                }
             },
-            include: { items: true },
+            include: { items: true }
         });
 
         res.status(201).json(order);

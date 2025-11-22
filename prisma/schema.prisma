@@ -53,39 +53,54 @@ model Menu {
 }
 
 model MenuItem {
-  id        String  @id @default(uuid())
-  menu      Menu    @relation(fields:[menuId], references:[id])
-  menuId    String
-  name      String
-  price     Float
-  qty       Int     @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String           @id @default(uuid())
+  menuId       String
+  menu         Menu             @relation(fields: [menuId], references: [id])
+  name         String
+  description  String?
+  price        Decimal          @db.Decimal(10, 2)
+  qty          Int              @default(0)
+  imageUrl     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  orderItems   OrderItem[]
+  options      MenuItemOption[]
+}
+
+model MenuItemOption {
+  id           String   @id @default(uuid())
+  menuItemId   String
+  menuItem     MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name         String
+  price        Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Order {
   id           String      @id @default(uuid())
-  userId       String?
   restaurantId String
-  total        Float
-  status       OrderStatus @default(PENDING)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id])
   customerName String?
   tableNumber  String?
-
-  user       User?       @relation(fields: [userId], references: [id])
-  restaurant Restaurant  @relation(fields: [restaurantId], references: [id])
-  items      OrderItem[]
+  status       OrderStatus @default(PENDING)
+  total        Decimal     @db.Decimal(10, 2)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  items        OrderItem[]
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  order     Order   @relation(fields:[orderId], references:[id])
-  orderId   String
-  name      String
-  price     Float
-  qty       Int
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  menuItemId      String
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  qty             Int
+  price           Decimal  @db.Decimal(10, 2) // Price at time of order (including options)
+  selectedOptions Json?    // Array of { name: string, price: number }
 }
 
 enum Role {

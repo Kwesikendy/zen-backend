@@ -33,7 +33,11 @@ export const getRestaurantMenus = async (req: AuthRequest, res: Response) => {
         const { restaurantId } = req.params;
         const menus = await prisma.menu.findMany({
             where: { restaurantId },
-            include: { items: true },
+            include: {
+                items: {
+                    include: { options: true }
+                }
+            },
         });
         res.json(menus);
     } catch (error: any) {
@@ -43,12 +47,12 @@ export const getRestaurantMenus = async (req: AuthRequest, res: Response) => {
 
 export const addMenuItem = async (req: AuthRequest, res: Response) => {
     try {
-        const validatedData = addMenuItemSchema.parse(req.body);
+        const { menuId, name, price, qty, options } = addMenuItemSchema.parse(req.body);
         const userId = req.user!.userId;
 
         // Verify ownership via menu -> restaurant
         const menu = await prisma.menu.findUnique({
-            where: { id: validatedData.menuId },
+            where: { id: menuId },
             include: { restaurant: true },
         });
         if (!menu) return res.status(404).json({ error: 'Menu not found' });
@@ -56,11 +60,15 @@ export const addMenuItem = async (req: AuthRequest, res: Response) => {
 
         const item = await prisma.menuItem.create({
             data: {
-                menuId: validatedData.menuId,
-                name: validatedData.name,
-                price: validatedData.price,
-                qty: validatedData.qty || 0,
+                menuId,
+                name,
+                price,
+                qty: qty || 0,
+                options: {
+                    create: options // Create options if provided
+                }
             },
+            include: { options: true }
         });
 
         res.status(201).json(item);

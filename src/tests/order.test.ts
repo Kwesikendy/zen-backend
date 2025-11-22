@@ -81,19 +81,45 @@ describe('Order Management', () => {
         await prisma.$disconnect();
     });
 
-    it('should create an order', async () => {
+    it('should create an order with options', async () => {
+        // Fetch the item to get its options
+        const item = await prisma.menuItem.findUnique({
+            where: { id: menuItemId },
+            include: { options: true }
+        });
+
+        // If no options exist (from setup), create one manually for this test
+        let optionId;
+        if (!item?.options || item.options.length === 0) {
+            const opt = await prisma.menuItemOption.create({
+                data: {
+                    menuItemId,
+                    name: 'Extra Cheese',
+                    price: 2.00
+                }
+            });
+            optionId = opt.id;
+        } else {
+            optionId = item.options[0].id;
+        }
+
         const res = await request(app)
             .post('/orders')
             .set('Authorization', `Bearer ${userToken}`)
             .send({
                 restaurantId,
                 items: [
-                    { menuItemId, qty: 2 }
+                    {
+                        menuItemId,
+                        qty: 1,
+                        options: [optionId]
+                    }
                 ]
             });
 
         expect(res.status).toBe(201);
-        expect(res.body.total).toBe(20.00); // 10.00 * 2
+        // Base price 10.00 + Option 2.00 = 12.00
+        expect(Number(res.body.total)).toBe(12.00);
         expect(res.body.status).toBe('PENDING');
     });
 
