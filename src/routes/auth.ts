@@ -14,7 +14,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const hashed = await argon2.hash(password);
     const user = await prisma.user.create({ data: { email, password: hashed, name } });
-    const access = signAccessToken({ userId: user.id, role: user.role });
+    const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
     const refresh = signRefreshToken({ userId: user.id });
 
     await prisma.refreshToken.create({
@@ -31,7 +31,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const ok = await argon2.verify(user.password, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const access = signAccessToken({ userId: user.id, role: user.role });
+    const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
     const refresh = signRefreshToken({ userId: user.id });
 
     await prisma.refreshToken.create({

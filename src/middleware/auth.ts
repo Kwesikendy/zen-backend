@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
     user?: {
         userId: string;
         role: string;
+        email: string;
     };
 }
 
@@ -15,7 +16,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     if (!token) return res.sendStatus(401);
 
     try {
-        const user = verifyAccessToken(token) as { userId: string; role: string };
+        const user = verifyAccessToken(token) as { userId: string; role: string; email: string };
         (req as AuthRequest).user = user;
         next();
     } catch (err) {

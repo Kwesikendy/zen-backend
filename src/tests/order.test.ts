@@ -119,8 +119,8 @@ describe('Order Management', () => {
 
         expect(res.status).toBe(201);
         // Base price 10.00 + Option 2.00 = 12.00
-        expect(Number(res.body.total)).toBe(12.00);
-        expect(res.body.status).toBe('PENDING');
+        expect(Number(res.body.order.total)).toBe(12.00);
+        expect(res.body.order.status).toBe('PENDING');
     });
 
     it('should get my orders', async () => {
@@ -172,7 +172,7 @@ describe('Order Management', () => {
             });
 
         expect(res.status).toBe(201);
-        expect(res.body.customerName).toBe('Guest John');
+        expect(res.body.order.customerName).toBe('Guest John');
     });
 
     it('should create an order with tableNumber', async () => {
@@ -188,6 +188,6 @@ describe('Order Management', () => {
             });
 
         expect(res.status).toBe(201);
-        expect(res.body.tableNumber).toBe('Table 5');
+        expect(res.body.order.tableNumber).toBe('Table 5');
     });
 });

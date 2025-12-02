@@ -1,14 +1,13 @@
-import express from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { Router } from 'express';
 import { createMenu, getRestaurantMenus, addMenuItem, updateMenuItem } from '../controllers/menu';
+import { authenticateToken } from '../middleware/auth';
+import upload from '../middleware/upload';
 
-const router = express.Router();
+const router = Router();
 
-router.use(authenticateToken);
-
-router.post('/', createMenu);
-router.get('/:restaurantId', getRestaurantMenus);
-router.post('/items', addMenuItem);
-router.put('/items/:id', updateMenuItem);
+router.post('/', authenticateToken, createMenu);
+router.get('/:restaurantId', authenticateToken, getRestaurantMenus);
+router.post('/items', authenticateToken, upload.single('image'), addMenuItem);
+router.put('/items/:id', authenticateToken, updateMenuItem);
 
 export default router;

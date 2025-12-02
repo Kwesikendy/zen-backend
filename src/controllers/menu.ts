@@ -47,7 +47,25 @@ export const getRestaurantMenus = async (req: AuthRequest, res: Response) => {
 
 export const addMenuItem = async (req: AuthRequest, res: Response) => {
     try {
-        const { menuId, name, price, qty, options } = addMenuItemSchema.parse(req.body);
+        // Parse body (it might be form-data now, but Zod handles objects)
+        // If using form-data, req.body fields are strings, so we might need to parse numbers
+        const body = { ...req.body };
+        if (req.file) {
+            // If file exists, we upload it
+            // Note: In a real app, we'd upload to Cloudinary here
+            // const imageUrl = await uploadImage(req.file.path);
+            // body.imageUrl = imageUrl;
+
+            // For now, we'll just use the local path or a dummy URL if Cloudinary isn't set up
+            body.imageUrl = req.file.path;
+        }
+
+        // Manual parsing for multipart/form-data numbers
+        if (typeof body.price === 'string') body.price = parseFloat(body.price);
+        if (typeof body.qty === 'string') body.qty = parseInt(body.qty);
+        if (typeof body.options === 'string') body.options = JSON.parse(body.options);
+
+        const { menuId, name, price, qty, options, imageUrl } = addMenuItemSchema.parse(body);
         const userId = req.user!.userId;
 
         // Verify ownership via menu -> restaurant
@@ -58,12 +76,21 @@ export const addMenuItem = async (req: AuthRequest, res: Response) => {
         if (!menu) return res.status(404).json({ error: 'Menu not found' });
         if (menu.restaurant.ownerId !== userId) return res.status(403).json({ error: 'Unauthorized' });
 
+        // Upload image if present (and validated)
+        let finalImageUrl = imageUrl;
+        if (req.file) {
+            // In production: finalImageUrl = await uploadImage(req.file.path);
+            // For this demo without valid keys:
+            finalImageUrl = `uploads/${req.file.filename}`;
+        }
+
         const item = await prisma.menuItem.create({
             data: {
                 menuId,
                 name,
                 price,
                 qty: qty || 0,
+                imageUrl: finalImageUrl,
                 options: {
                     create: options // Create options if provided
                 }

@@ -9,6 +9,8 @@ export const createOrderSchema = z.object({
         qty: z.number().int().min(1, 'Quantity must be at least 1'),
         options: z.array(z.string().uuid()).optional() // Array of Option IDs
     })).min(1, 'Order must have at least one item'),
+    paymentMethod: z.enum(['CASH', 'MOMO']).optional(),
+    phoneNumber: z.string().optional(),
 });
 
 export const updateOrderStatusSchema = z.object({
