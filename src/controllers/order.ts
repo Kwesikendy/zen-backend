@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { createOrderSchema, updateOrderStatusSchema } from '../schemas/order';
 import { initializeTransaction } from '../services/payment';
 import { sendSMS, generateTicketCode } from '../services/notification';
+import { emitToRestaurant, emitToUser } from '../services/socket';
 
 const prisma = new PrismaClient();
 
@@ -22,11 +23,16 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
         // 3. Calculate Total
         let total = 0;
-        const orderItemsData = [];
+        const orderItemsData: any[] = [];
 
         for (const item of items) {
             const menuItem = menuItems.find(m => m.id === item.menuItemId);
             if (!menuItem) throw new Error(`Menu item ${item.menuItemId} not found`);
+
+            // Inventory Check
+            if (menuItem.qty < item.qty) {
+                throw new Error(`Out of stock: ${menuItem.name}. Only ${menuItem.qty} left.`);
+            }
 
             let itemPrice = Number(menuItem.price);
             const selectedOptions = [];
@@ -81,30 +87,44 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         }
 
         // 6. Create Order
-        const order = await prisma.order.create({
-            data: {
-                restaurantId,
-                userId,
-                customerName,
-                tableNumber,
-                total,
-                status: 'PENDING',
-                paymentMethod: paymentMethod || 'CASH',
-                paymentStatus,
-                phoneNumber,
-                ticketCode,
-                paystackReference: paystackData?.reference,
-                items: {
-                    create: orderItemsData
-                }
-            },
-            include: { items: true }
+        // 6. Create Order with Inventory Decrement
+        const order = await prisma.$transaction(async (tx) => {
+            // Decrement Stock
+            for (const item of items) {
+                await tx.menuItem.update({
+                    where: { id: item.menuItemId },
+                    data: { qty: { decrement: item.qty } }
+                });
+            }
+
+            return tx.order.create({
+                data: {
+                    restaurantId,
+                    userId,
+                    customerName,
+                    tableNumber,
+                    total,
+                    status: 'PENDING',
+                    paymentMethod: paymentMethod || 'CASH',
+                    paymentStatus,
+                    phoneNumber,
+                    ticketCode,
+                    paystackReference: paystackData?.reference,
+                    items: {
+                        create: orderItemsData
+                    }
+                },
+                include: { items: true }
+            });
         });
 
         // 7. Send SMS (Ticket Code)
         if (phoneNumber) {
             await sendSMS(phoneNumber, `Your Zenran Order #${ticketCode} is placed. Total: ${total}`);
         }
+
+        // 8. Real-time Notification
+        emitToRestaurant(restaurantId, 'NEW_ORDER', order);
 
         res.status(201).json({
             order,
@@ -183,16 +203,45 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
 
         const order = await prisma.order.findUnique({
             where: { id },
-            include: { restaurant: true },
+            include: { restaurant: true, items: true },
         });
 
         if (!order) return res.status(404).json({ error: 'Order not found' });
         if (order.restaurant.ownerId !== userId) return res.status(403).json({ error: 'Unauthorized' });
 
+        // Handle Inventory Restock on Cancellation
+        if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+            await prisma.$transaction(async (tx) => {
+                for (const item of order.items) {
+                    await tx.menuItem.update({
+                        where: { id: item.menuItemId },
+                        data: { qty: { increment: item.qty } }
+                    });
+                }
+
+                await tx.order.update({
+                    where: { id },
+                    data: { status }
+                });
+            });
+            // Fetch updated order to return
+            const updated = await prisma.order.findUnique({ where: { id } });
+
+            if (updated) {
+                emitToRestaurant(order.restaurantId, 'ORDER_STATUS_UPDATE', updated);
+                if (updated.userId) emitToUser(updated.userId, 'ORDER_STATUS_UPDATE', updated);
+            }
+
+            return res.json(updated);
+        }
+
         const updated = await prisma.order.update({
             where: { id },
             data: { status },
         });
+
+        emitToRestaurant(order.restaurantId, 'ORDER_STATUS_UPDATE', updated);
+        if (updated.userId) emitToUser(updated.userId, 'ORDER_STATUS_UPDATE', updated);
 
         res.json(updated);
     } catch (error: any) {

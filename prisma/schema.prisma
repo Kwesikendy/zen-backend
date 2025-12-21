@@ -65,7 +65,20 @@ model MenuItem {
   updatedAt    DateTime         @updatedAt
   orderItems   OrderItem[]
   options      MenuItemOption[]
+  reviews      Review[]
 }
+
+model Review {
+  id           String   @id @default(uuid())
+  menuItemId   String
+  menuItem     MenuItem @relation(fields: [menuItemId], references: [id])
+  userId       String?
+  userName     String
+  rating       Int
+  comment      String?
+  createdAt    DateTime @default(now())
+}
+
 
 model MenuItemOption {
   id           String   @id @default(uuid())

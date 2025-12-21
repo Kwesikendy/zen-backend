@@ -1,4 +1,6 @@
 import { createApp } from './app';
+import { initSocket } from './services/socket';
 const app = createApp();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`server listening on ${PORT}`));
+const server = app.listen(PORT, () => console.log(`server listening on ${PORT}`));
+initSocket(server);

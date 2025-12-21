@@ -9,7 +9,10 @@
 *   **Authentication & Security**: Secure user registration and login using JWT (Access + Refresh tokens) and Argon2 password hashing.
 *   **Restaurant Management**: Create and manage restaurant profiles.
 *   **Menu Management**: Create menus, add items with options (e.g., "Spicy", "Extra Cheese"), and handle image uploads.
+*   **Inventory Management**: **[NEW]** Automatic stock tracking. Orders decrement stock; entering 0 marks item as "Out of Stock". Cancellations restock items.
+*   **Reviews & Ratings**: **[NEW]** Customers can leave 1-5 star ratings and comments on menu items.
 *   **Order Processing**: Complete order lifecycle management (Create -> Pending -> Paid/Confirmed -> Completed).
+*   **Real-Time Notifications**: **[NEW]** WebSockets (Socket.io) integration for instant order updates to the kitchen.
 *   **Payments**: Integrated **Mobile Money (MoMo)** and **Card** payments via **Paystack**.
 *   **Notifications**: Automated **SMS notifications** to customers with unique ticket codes upon order placement.
 *   **Sales Reports**: Generate detailed sales reports grouped by payment method.
@@ -145,8 +148,26 @@ This section is specifically for Frontend Engineers integrating with the Zenran 
 *   `GET /orders/restaurant/:restaurantId`: Get incoming orders for a restaurant (Owner only).
 *   `PATCH /orders/:id/status`: Update order status (e.g., `PENDING` -> `COMPLETED`).
 
-#### 5. Reports
+#### 5. Reviews [NEW]
+*   `POST /reviews/:menuItemId`: Add a review.
+    *   Body: `{ rating: 5, comment: "Tasty!", userName: "John" }`
+*   `GET /reviews/:menuItemId`: Get reviews for an item.
+
+#### 6. Reports
 *   `GET /reports/sales?restaurantId=...`: Get sales summary grouped by payment method.
+
+---
+
+## 🔌 Real-Time Integration (Socket.io)
+
+The backend now supports real-time events.
+*   **Connect**: `const socket = io('http://localhost:3000');`
+*   **Events**:
+    *   `NEW_ORDER` (Restaurant Room): Sent when a new order is placed.
+    *   `ORDER_STATUS_UPDATE` (User/Restaurant Room): Sent when status changes.
+*   **Rooms**:
+    *   `socket.emit('joinRestaurant', restaurantId)`
+    *   `socket.emit('joinUser', userId)`
 
 ---
 
