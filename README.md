@@ -87,13 +87,13 @@ Follow these steps to set up the backend locally.
 
 ---
 
-## 💻 Frontend Integration Guide
 
 This section is specifically for Frontend Engineers integrating with the Zenran Backend.
 
 ### Base URL
 *   **Local**: `http://localhost:3000`
-*   **Production**: `https://<your-hosted-domain>.com`
+*   **Production**: `https://zen-ful3.onrender.com`
+
 
 ### Authentication Flow
 1.  **Register/Login**: Send `POST` request to `/auth/register` or `/auth/login`.
@@ -121,6 +121,7 @@ This section is specifically for Frontend Engineers integrating with the Zenran 
     *   Body: `{ token }` (Refresh Token)
 
 #### 2. Restaurants
+## 💻 Frontend Integration Guide
 *   `POST /restaurants`: Create a restaurant.
     *   Body: `{ name, address, phone }`
 *   `GET /restaurants/:id`: Get restaurant details.

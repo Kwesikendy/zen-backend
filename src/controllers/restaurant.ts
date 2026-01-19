@@ -37,6 +37,18 @@ export const getMyRestaurants = async (req: AuthRequest, res: Response) => {
     }
 };
 
+// Public endpoint - get all restaurants
+export const getAllRestaurants = async (req: AuthRequest, res: Response) => {
+    try {
+        const restaurants = await prisma.restaurant.findMany({
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json(restaurants);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const updateRestaurant = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;

@@ -1,8 +1,11 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { createRestaurant, getMyRestaurants, updateRestaurant, deleteRestaurant } from '../controllers/restaurant';
+import { createRestaurant, getMyRestaurants, getAllRestaurants, updateRestaurant, deleteRestaurant } from '../controllers/restaurant';
 
 const router = express.Router();
+
+// Public route - must come before authenticateToken middleware
+router.get('/all', getAllRestaurants);
 
 router.use(authenticateToken);
 
