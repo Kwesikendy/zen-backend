@@ -21,7 +21,7 @@ router.post('/register', async (req: Request, res: Response) => {
         data: { token: refresh, userId: user.id, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
     });
 
-    res.status(201).json({ accessToken: access, refreshToken: refresh, user: { id: user.id, email: user.email, name: user.name } });
+    res.status(201).json({ accessToken: access, refreshToken: refresh, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 });
 
 router.post('/login', async (req: Request, res: Response) => {
@@ -38,7 +38,7 @@ router.post('/login', async (req: Request, res: Response) => {
         data: { token: refresh, userId: user.id, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
     });
 
-    res.json({ accessToken: access, refreshToken: refresh, user: { id: user.id, email: user.email } });
+    res.json({ accessToken: access, refreshToken: refresh, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 });
 
 export default router;
