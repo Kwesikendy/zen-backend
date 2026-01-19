@@ -7,13 +7,20 @@ const prisma = new PrismaClient();
 const router = express.Router();
 
 router.post('/register', async (req: Request, res: Response) => {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email in use' });
 
     const hashed = await argon2.hash(password);
-    const user = await prisma.user.create({ data: { email, password: hashed, name } });
+    const user = await prisma.user.create({
+        data: {
+            email,
+            password: hashed,
+            name,
+            role: role || 'USER' // Default to USER if not provided
+        }
+    });
     const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
     const refresh = signRefreshToken({ userId: user.id });
 
