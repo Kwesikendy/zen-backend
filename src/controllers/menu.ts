@@ -65,7 +65,7 @@ export const addMenuItem = async (req: AuthRequest, res: Response) => {
         if (typeof body.qty === 'string') body.qty = parseInt(body.qty);
         if (typeof body.options === 'string') body.options = JSON.parse(body.options);
 
-        const { menuId, name, price, qty, options, imageUrl } = addMenuItemSchema.parse(body);
+        const { menuId, name, description, price, qty, options, imageUrl } = addMenuItemSchema.parse(body);
         const userId = req.user!.userId;
 
         // Verify ownership via menu -> restaurant
@@ -88,6 +88,7 @@ export const addMenuItem = async (req: AuthRequest, res: Response) => {
             data: {
                 menuId,
                 name,
+                description,
                 price,
                 qty: qty || 0,
                 imageUrl: finalImageUrl,

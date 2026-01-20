@@ -11,7 +11,8 @@ export const initializeTransaction = async (email: string, amount: number, refer
                 email,
                 amount: amount * 100,
                 reference,
-                channels: ['mobile_money', 'card']
+                channels: ['mobile_money', 'card'],
+                callback_url: process.env.PAYSTACK_CALLBACK_URL
             },
             {
                 headers: {

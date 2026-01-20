@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createApp } from './app';
 import { initSocket } from './services/socket';
 const app = createApp();

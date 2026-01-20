@@ -8,117 +8,117 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  restaurants Restaurant[]
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  password      String
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  pushToken     String?
+  orders        Order[]
   refreshTokens RefreshToken[]
-  orders    Order[]
+  restaurants   Restaurant[]
 }
 
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Restaurant {
   id        String   @id @default(uuid())
-  owner     User?    @relation(fields: [ownerId], references: [id])
   ownerId   String?
   name      String
   address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   phone     String?
   menus     Menu[]
   orders    Order[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  owner     User?    @relation(fields: [ownerId], references: [id])
 }
 
 model Menu {
-  id          String     @id @default(uuid())
-  restaurant  Restaurant @relation(fields:[restaurantId], references:[id])
+  id           String     @id @default(uuid())
   restaurantId String
-  title       String
-  items       MenuItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  title        String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  items        MenuItem[]
 }
 
 model MenuItem {
-  id           String           @id @default(uuid())
-  menuId       String
-  menu         Menu             @relation(fields: [menuId], references: [id])
-  name         String
-  description  String?
-  price        Decimal          @db.Decimal(10, 2)
-  qty          Int              @default(0)
-  imageUrl     String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  orderItems   OrderItem[]
-  options      MenuItemOption[]
-  reviews      Review[]
+  id          String           @id @default(uuid())
+  menuId      String
+  name        String
+  price       Decimal          @db.Decimal(10, 2)
+  qty         Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  description String?
+  imageUrl    String?
+  menu        Menu             @relation(fields: [menuId], references: [id])
+  options     MenuItemOption[]
+  orderItems  OrderItem[]
+  reviews     Review[]
 }
 
 model Review {
-  id           String   @id @default(uuid())
-  menuItemId   String
-  menuItem     MenuItem @relation(fields: [menuItemId], references: [id])
-  userId       String?
-  userName     String
-  rating       Int
-  comment      String?
-  createdAt    DateTime @default(now())
+  id         String   @id @default(uuid())
+  menuItemId String
+  userId     String?
+  userName   String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
 }
 
-
 model MenuItemOption {
-  id           String   @id @default(uuid())
-  menuItemId   String
-  menuItem     MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  name         String
-  price        Decimal  @db.Decimal(10, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  menuItemId String
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
 model Order {
-  id           String      @id @default(uuid())
-  restaurantId String
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
-  userId       String?
-  user         User?       @relation(fields: [userId], references: [id])
-  customerName String?
-  tableNumber  String?
-  status       OrderStatus @default(PENDING)
-  paymentMethod PaymentMethod @default(CASH)
-  paymentStatus PaymentStatus @default(PENDING)
-  phoneNumber  String?
-  ticketCode   String?      // e.g. "A-101"
+  id                String        @id @default(uuid())
+  userId            String?
+  restaurantId      String
+  total             Decimal       @db.Decimal(10, 2)
+  status            OrderStatus   @default(PENDING)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  customerName      String?
+  tableNumber       String?
+  paymentMethod     PaymentMethod @default(CASH)
+  paymentStatus     PaymentStatus @default(PENDING)
   paystackReference String?
-  total        Decimal     @db.Decimal(10, 2)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  items        OrderItem[]
+  phoneNumber       String?
+  ticketCode        String?
+  restaurant        Restaurant    @relation(fields: [restaurantId], references: [id])
+  user              User?         @relation(fields: [userId], references: [id])
+  items             OrderItem[]
 }
 
 model OrderItem {
   id              String   @id @default(uuid())
   orderId         String
-  order           Order    @relation(fields: [orderId], references: [id])
-  menuItemId      String
-  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  price           Decimal  @db.Decimal(10, 2)
   qty             Int
-  price           Decimal  @db.Decimal(10, 2) // Price at time of order (including options)
-  selectedOptions Json?    // Array of { name: string, price: number }
+  menuItemId      String
+  selectedOptions Json?
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  order           Order    @relation(fields: [orderId], references: [id])
 }
 
 enum Role {

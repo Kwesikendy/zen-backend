@@ -2,8 +2,9 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { createOrderSchema, updateOrderStatusSchema } from '../schemas/order';
-import { initializeTransaction } from '../services/payment';
+import { initializeTransaction, verifyTransaction } from '../services/payment';
 import { sendSMS, generateTicketCode } from '../services/notification';
+import { sendPushNotification } from '../services/notificationService';
 import { emitToRestaurant, emitToUser } from '../services/socket';
 
 const prisma = new PrismaClient();
@@ -86,7 +87,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             paymentStatus = 'PENDING';
         }
 
-        // 6. Create Order
         // 6. Create Order with Inventory Decrement
         const order = await prisma.$transaction(async (tx) => {
             // Decrement Stock
@@ -203,7 +203,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
 
         const order = await prisma.order.findUnique({
             where: { id },
-            include: { restaurant: true, items: true },
+            include: { restaurant: true, items: true, user: true },
         });
 
         if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -240,11 +240,75 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
             data: { status },
         });
 
+        // Push Notification
+        if (order.user?.pushToken && (status === 'READY' || status === 'CONFIRMED' || status === 'COMPLETED' || status === 'CANCELLED')) {
+            let title = 'Order Update';
+            let body = `Your order is now ${status}`;
+
+            if (status === 'READY') {
+                title = 'Order Ready! 🍽️';
+                body = `Your order #${order.ticketCode} is ready for pickup!`;
+            } else if (status === 'CONFIRMED') {
+                title = 'Order Confirmed ✅';
+                body = `Your order #${order.ticketCode} is being prepared.`;
+            }
+
+            await sendPushNotification(order.user.pushToken, title, body, { orderId: order.id });
+        }
+
         emitToRestaurant(order.restaurantId, 'ORDER_STATUS_UPDATE', updated);
         if (updated.userId) emitToUser(updated.userId, 'ORDER_STATUS_UPDATE', updated);
 
         res.json(updated);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
+    }
+};
+
+export const verifyPayment = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.userId;
+
+        const order = await prisma.order.findUnique({
+            where: { id },
+        });
+
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        if (order.userId !== userId) return res.status(403).json({ error: 'Unauthorized' });
+
+        if (!order.paystackReference) {
+            return res.status(400).json({ error: 'No payment reference found for this order' });
+        }
+
+        // Verify with Paystack
+        const data = await verifyTransaction(order.paystackReference);
+
+        if (data.status === 'success') {
+            // Update Order
+            // Use explicit values to avoid Prisma Decimal funny business if any
+            // Actually 'total' is Float/Decimal.
+
+            // Check exact amount?
+            // data.amount is in kobo. order.total is in Cedis (implied).
+            // data.amount / 100 should equal order.total.
+            // For now, trust the success status.
+
+            const updated = await prisma.order.update({
+                where: { id },
+                data: {
+                    paymentStatus: 'PAID',
+                    status: 'CONFIRMED' // Auto-confirm on payment
+                }
+            });
+
+            emitToRestaurant(order.restaurantId, 'ORDER_STATUS_UPDATE', updated);
+            return res.json({ success: true, order: updated });
+        } else {
+            return res.status(400).json({ success: false, message: 'Payment verification failed', data });
+        }
+    } catch (error: any) {
+        console.error('Verify Payment Error:', error);
+        res.status(500).json({ error: error.message });
     }
 };

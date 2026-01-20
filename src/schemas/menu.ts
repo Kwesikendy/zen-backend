@@ -9,6 +9,7 @@ export const createMenuSchema = z.object({
 export const addMenuItemSchema = z.object({
     menuId: z.string().uuid(),
     name: z.string().min(1, 'Name is required'),
+    description: z.string().optional(),
     price: z.number().min(0, 'Price must be positive'),
     qty: z.number().int().min(0).optional(),
     imageUrl: z.string().optional(),
@@ -20,6 +21,7 @@ export const addMenuItemSchema = z.object({
 
 export const updateMenuItemSchema = z.object({
     name: z.string().min(1).optional(),
+    description: z.string().optional(),
     price: z.number().min(0).optional(),
     qty: z.number().int().min(0).optional(),
 });
