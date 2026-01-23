@@ -10,6 +10,7 @@ import orderRoutes from './routes/orders';
 import reportRoutes from './routes/reports';
 import reviewRoutes from './routes/reviews';
 import userRoutes from './routes/users';
+import adminRoutes from './routes/admin';
 
 export const createApp = () => {
     const app = express();
@@ -25,6 +26,7 @@ export const createApp = () => {
     app.use('/reports', reportRoutes);
     app.use('/reviews', reviewRoutes);
     app.use('/users', userRoutes);
+    app.use('/admin', adminRoutes);
     app.get('/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
     return app;
 };
