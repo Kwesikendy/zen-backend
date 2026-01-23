@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { createMenuSchema, addMenuItemSchema, updateMenuItemSchema } from '../schemas/menu';
+import { uploadImage } from '../services/image';
 
 const prisma = new PrismaClient();
 
@@ -76,12 +77,15 @@ export const addMenuItem = async (req: AuthRequest, res: Response) => {
         if (!menu) return res.status(404).json({ error: 'Menu not found' });
         if (menu.restaurant.ownerId !== userId) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Upload image if present (and validated)
+        // Upload image to Cloudinary if present
         let finalImageUrl = imageUrl;
         if (req.file) {
-            // In production: finalImageUrl = await uploadImage(req.file.path);
-            // For this demo without valid keys:
-            finalImageUrl = `uploads/${req.file.filename}`;
+            try {
+                finalImageUrl = await uploadImage(req.file.path);
+            } catch (error) {
+                console.error('Cloudinary upload failed:', error);
+                return res.status(500).json({ error: 'Image upload failed' });
+            }
         }
 
         const item = await prisma.menuItem.create({
