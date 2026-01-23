@@ -20,6 +20,8 @@ model User {
   orders        Order[]
   refreshTokens RefreshToken[]
   restaurants   Restaurant[]
+  payouts       VendorPayout[]
+  adminActions  AdminAction[]
 }
 
 model RefreshToken {
@@ -106,9 +108,11 @@ model Order {
   paystackReference String?
   phoneNumber       String?
   ticketCode        String?
-  restaurant        Restaurant    @relation(fields: [restaurantId], references: [id])
-  user              User?         @relation(fields: [userId], references: [id])
+  restaurant        Restaurant     @relation(fields: [restaurantId], references: [id])
+  user              User?          @relation(fields: [userId], references: [id])
   items             OrderItem[]
+  transactions      Transaction[]
+  vendorPayouts     VendorPayout[]
 }
 
 model OrderItem {
@@ -143,6 +147,68 @@ enum PaymentMethod {
 }
 
 enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Transaction {
+  id               String             @id @default(uuid())
+  orderId          String
+  order            Order              @relation(fields: [orderId], references: [id])
+  type             TransactionType
+  method           PaymentMethod
+  amount           Decimal            @db.Decimal(10, 2)
+  status           TransactionStatus
+  paystackRef      String?
+  settlementStatus SettlementStatus?
+  settledAt        DateTime?
+  metadata         Json?
+  createdAt        DateTime           @default(now())
+}
+
+model VendorPayout {
+  id        String       @id @default(uuid())
+  vendorId  String
+  vendor    User         @relation(fields: [vendorId], references: [id])
+  amount    Decimal      @db.Decimal(10, 2)
+  status    PayoutStatus
+  orderId   String?
+  order     Order?       @relation(fields: [orderId], references: [id])
+  paidAt    DateTime?
+  createdAt DateTime     @default(now())
+}
+
+model AdminAction {
+  id         String   @id @default(uuid())
+  adminId    String
+  admin      User     @relation(fields: [adminId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+enum TransactionType {
+  PAYMENT
+  PAYOUT
+  REFUND
+  COMMISSION
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+}
+
+enum PayoutStatus {
   PENDING
   PAID
   FAILED
