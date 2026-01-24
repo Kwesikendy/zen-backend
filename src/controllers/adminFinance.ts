@@ -27,14 +27,16 @@ export const getFinancialOverview = async (req: AuthRequest, res: Response) => {
             .reduce((sum, order) => sum + Number(order.total), 0);
 
         // Paystack settlement tracking
-        const paystackTransactions = await prisma.transaction.findMany({
-            where: { method: 'MOMO' }
+        const allPaystackOrders = await prisma.order.findMany({
+            where: {
+                paymentMethod: 'MOMO',
+                paymentStatus: 'PAID'
+            }
         });
 
-        const paystackTotal = paystackTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-        const paystackSettled = paystackTransactions
-            .filter(t => t.settlementStatus === 'SETTLED')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const paystackTotal = allPaystackOrders.reduce((sum, o) => sum + Number(o.total), 0);
+        // Settlement tracking is not yet implemented for Paystack payouts to platform
+        const paystackSettled = 0;
         const paystackPending = paystackTotal - paystackSettled;
 
         // Vendor payouts
@@ -166,7 +168,7 @@ export const getVendors = async (req: AuthRequest, res: Response) => {
                     totalSales,
                     totalOrders: orders.length,
                     pendingPayout,
-                    isActive: !vendor.isBanned
+                    isSuspended: vendor.isBanned
                 };
             })
         );
@@ -240,5 +242,95 @@ export const activateVendor = async (req: AuthRequest, res: Response) => {
     } catch (error) {
         console.error('Activate Vendor Error:', error);
         res.status(500).json({ error: 'Failed to activate vendor' });
+    }
+};
+
+// POST /admin/vendors/:id/payout
+export const settleVendorPayout = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { amount, reference } = req.body;
+        const adminId = req.user!.userId;
+
+        // 1. Verify the amount matches pending total (Double-Check)
+        // Find all pending payouts
+        const pendingPayouts = await prisma.vendorPayout.findMany({
+            where: {
+                vendorId: id,
+                status: 'PENDING'
+            }
+        });
+
+        const totalPending = pendingPayouts.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        // Allow for small floating point differences
+        if (Math.abs(totalPending - Number(amount)) > 0.01) {
+            return res.status(400).json({
+                error: 'Amount mismatch',
+                details: `System calculates ${totalPending}, but ${amount} was sent.`
+            });
+        }
+
+        if (totalPending <= 0) {
+            return res.status(400).json({ error: 'No pending funds to settle' });
+        }
+
+        // 2. Perform Settlement Transaction (Atomic)
+        const settlement = await prisma.$transaction(async (tx) => {
+            // A. Update Vendor Payouts to PAID
+            await tx.vendorPayout.updateMany({
+                where: {
+                    vendorId: id,
+                    status: 'PENDING'
+                },
+                data: {
+                    status: 'PAID',
+                    paidAt: new Date()
+                }
+            });
+
+            // B. Create Payout Transaction Record
+            // We link to the first order ID as a reference, since Transaction requires orderId
+            const representativeOrderId = pendingPayouts[0]?.orderId;
+
+            const payoutTx = await tx.transaction.create({
+                data: {
+                    orderId: representativeOrderId!,
+                    type: 'PAYOUT',
+                    method: 'CASH', // Assuming external settlement
+                    amount: totalPending,
+                    status: 'COMPLETED',
+                    paystackRef: reference,
+                    metadata: {
+                        adminId,
+                        settledCount: pendingPayouts.length,
+                        note: 'Bulk Settlement via Admin Dashboard'
+                    }
+                }
+            });
+
+            return payoutTx;
+        });
+
+        // 3. Log Admin Action
+        await prisma.adminAction.create({
+            data: {
+                adminId,
+                action: 'SETTLE_PAYOUT',
+                targetType: 'TRANSACTION',
+                targetId: settlement.id,
+                metadata: {
+                    amount: totalPending,
+                    vendorId: id,
+                    reference
+                }
+            }
+        });
+
+        res.json({ success: true, message: 'Settlement processed successfully', transaction: settlement });
+
+    } catch (error) {
+        console.error('Settle Payout Error:', error);
+        res.status(500).json({ error: 'Failed to settle payout' });
     }
 };

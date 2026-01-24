@@ -12,6 +12,8 @@ import reviewRoutes from './routes/reviews';
 import userRoutes from './routes/users';
 import adminRoutes from './routes/admin';
 import adminFinanceRoutes from './routes/adminFinance';
+import adminContentRoutes from './routes/adminContent';
+import paymentRoutes from './routes/payment';
 
 export const createApp = () => {
     const app = express();
@@ -29,6 +31,8 @@ export const createApp = () => {
     app.use('/users', userRoutes);
     app.use('/admin', adminRoutes);
     app.use('/admin', adminFinanceRoutes);
+    app.use('/admin', adminContentRoutes);
+    app.use('/payment', paymentRoutes);
     app.get('/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
     return app;
 };

@@ -240,6 +240,22 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
             data: { status },
         });
 
+        // Create Vendor Payout Record if Completed
+        if (status === 'COMPLETED' || status === 'CONFIRMED') {
+            // Check if payout exists
+            const existingPayout = await prisma.vendorPayout.findFirst({ where: { orderId: id } });
+            if (!existingPayout && order.restaurant.ownerId) {
+                await prisma.vendorPayout.create({
+                    data: {
+                        vendorId: order.restaurant.ownerId,
+                        orderId: id,
+                        amount: order.total,
+                        status: 'PENDING'
+                    }
+                });
+            }
+        }
+
         // Push Notification
         if (order.user?.pushToken && (status === 'READY' || status === 'CONFIRMED' || status === 'COMPLETED' || status === 'CANCELLED')) {
             let title = 'Order Update';
@@ -275,7 +291,10 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
         });
 
         if (!order) return res.status(404).json({ error: 'Order not found' });
-        if (order.userId !== userId) return res.status(403).json({ error: 'Unauthorized' });
+
+        console.log(`Verifying Payment: Order User ${order.userId} vs Request User ${userId}`);
+
+        if (order.userId !== userId) return res.status(403).json({ error: 'Unauthorized - User ID Mismatch' });
 
         if (!order.paystackReference) {
             return res.status(400).json({ error: 'No payment reference found for this order' });

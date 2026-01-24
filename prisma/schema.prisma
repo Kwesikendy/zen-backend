@@ -44,6 +44,10 @@ model Restaurant {
   menus     Menu[]
   orders    Order[]
   owner     User?    @relation(fields: [ownerId], references: [id])
+  isVerified      Boolean   @default(false)
+  verifiedAt      DateTime?
+  rejectionReason String?
+  isVisible       Boolean   @default(true) // Admin toggle for visibility
 }
 
 model Menu {

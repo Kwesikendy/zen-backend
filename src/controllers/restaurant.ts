@@ -41,6 +41,7 @@ export const getMyRestaurants = async (req: AuthRequest, res: Response) => {
 export const getAllRestaurants = async (req: AuthRequest, res: Response) => {
     try {
         const restaurants = await prisma.restaurant.findMany({
+            where: { isVerified: true, isVisible: true },
             orderBy: { createdAt: 'desc' },
         });
         res.json(restaurants);
@@ -83,6 +84,29 @@ export const deleteRestaurant = async (req: AuthRequest, res: Response) => {
 
         await prisma.restaurant.delete({ where: { id } });
         res.status(204).send();
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getRestaurant = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const restaurant = await prisma.restaurant.findUnique({
+            where: { id },
+            include: {
+                menus: {
+                    include: {
+                        items: {
+                            include: { options: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
+        res.json(restaurant);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

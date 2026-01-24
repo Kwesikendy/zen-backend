@@ -4,7 +4,8 @@ import {
     getTransactions,
     getVendors,
     suspendVendor,
-    activateVendor
+    activateVendor,
+    settleVendorPayout
 } from '../controllers/adminFinance';
 import { authenticateToken } from '../middleware/auth';
 import { Request, Response, NextFunction } from 'express';
@@ -28,5 +29,6 @@ router.get('/transactions', authenticateToken, verifyAdmin, getTransactions);
 router.get('/vendors', authenticateToken, verifyAdmin, getVendors);
 router.post('/vendors/:id/suspend', authenticateToken, verifyAdmin, suspendVendor);
 router.post('/vendors/:id/activate', authenticateToken, verifyAdmin, activateVendor);
+router.post('/vendors/:id/payout', authenticateToken, verifyAdmin, settleVendorPayout);
 
 export default router;

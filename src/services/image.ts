@@ -17,6 +17,7 @@ export const uploadImage = async (filePath: string): Promise<string> => {
         fs.unlinkSync(filePath);
         return result.secure_url;
     } catch (error) {
+        console.error('Cloudinary Upload Error Details:', error);
         // Ensure file is deleted even on error
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         throw new Error('Image upload failed');
