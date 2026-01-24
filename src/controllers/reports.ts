@@ -92,6 +92,15 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
             _count: { id: true }
         });
 
+        // 3. Status Breakdown (for fun visual)
+        const statusBreakdown = await prisma.order.groupBy({
+            by: ['status'],
+            where: {
+                restaurantId: { in: restaurantIds },
+            },
+            _count: { id: true }
+        });
+
         // 4. Payout Calculations (Balance Due)
         // Ensure we only count COMPLETED orders for earnings
         const earningsStats = await prisma.order.aggregate({
