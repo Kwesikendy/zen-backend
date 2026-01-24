@@ -48,6 +48,8 @@ model Restaurant {
   verifiedAt      DateTime?
   rejectionReason String?
   isVisible       Boolean   @default(true) // Admin toggle for visibility
+
+  @@index([ownerId])
 }
 
 model Menu {
@@ -58,6 +60,8 @@ model Menu {
   updatedAt    DateTime   @updatedAt
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   items        MenuItem[]
+
+  @@index([restaurantId])
 }
 
 model MenuItem {
@@ -74,6 +78,8 @@ model MenuItem {
   options     MenuItemOption[]
   orderItems  OrderItem[]
   reviews     Review[]
+
+  @@index([menuId])
 }
 
 model Review {
@@ -85,6 +91,8 @@ model Review {
   comment    String?
   createdAt  DateTime @default(now())
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([menuItemId])
 }
 
 model MenuItemOption {
@@ -95,6 +103,8 @@ model MenuItemOption {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId])
 }
 
 model Order {
@@ -117,6 +127,13 @@ model Order {
   items             OrderItem[]
   transactions      Transaction[]
   vendorPayouts     VendorPayout[]
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([restaurantId, status]) // Composite index for dashboard filtering
+  @@index([paystackReference])
 }
 
 model OrderItem {
@@ -128,6 +145,8 @@ model OrderItem {
   selectedOptions Json?
   menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
   order           Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 enum Role {
@@ -169,6 +188,11 @@ model Transaction {
   settledAt        DateTime?
   metadata         Json?
   createdAt        DateTime           @default(now())
+
+  @@index([orderId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model VendorPayout {
@@ -181,6 +205,9 @@ model VendorPayout {
   order     Order?       @relation(fields: [orderId], references: [id])
   paidAt    DateTime?
   createdAt DateTime     @default(now())
+
+  @@index([vendorId])
+  @@index([status])
 }
 
 model AdminAction {
@@ -192,6 +219,9 @@ model AdminAction {
   targetId   String
   metadata   Json?
   createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetId])
 }
 
 enum TransactionType {
