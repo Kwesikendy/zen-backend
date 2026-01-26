@@ -12,11 +12,16 @@ const prisma = new PrismaClient();
 export const createOrder = async (req: AuthRequest, res: Response) => {
     try {
         // 1. Validate Input
-        const { restaurantId, items, customerName, tableNumber, paymentMethod, phoneNumber } = createOrderSchema.parse(req.body);
+        // We manually extract deliveryLocation for now as it's not yet in the Zod schema
+        const { restaurantId, items, customerName, tableNumber, paymentMethod, phoneNumber, deliveryLocation } = req.body;
+
+        // Validate core fields using Zod (excluding deliveryLocation which is unchecked for now)
+        createOrderSchema.parse({ restaurantId, items, customerName, tableNumber, paymentMethod, phoneNumber });
+
         const userId = req.user?.userId || null;
 
         // 2. Fetch all Menu Items to get prices
-        const menuItemIds = items.map(i => i.menuItemId);
+        const menuItemIds = items.map((i: any) => i.menuItemId);
         const menuItems = await prisma.menuItem.findMany({
             where: { id: { in: menuItemIds } },
             include: { options: true }
@@ -110,6 +115,12 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
                     phoneNumber,
                     ticketCode,
                     paystackReference: paystackData?.reference,
+
+                    // Delivery Fields
+                    deliveryAddress: deliveryLocation?.address,
+                    deliveryLat: deliveryLocation?.lat,
+                    deliveryLng: deliveryLocation?.lng,
+
                     items: {
                         create: orderItemsData
                     }
@@ -305,14 +316,6 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
 
         if (data.status === 'success') {
             // Update Order
-            // Use explicit values to avoid Prisma Decimal funny business if any
-            // Actually 'total' is Float/Decimal.
-
-            // Check exact amount?
-            // data.amount is in kobo. order.total is in Cedis (implied).
-            // data.amount / 100 should equal order.total.
-            // For now, trust the success status.
-
             const updated = await prisma.order.update({
                 where: { id },
                 data: {

@@ -122,6 +122,11 @@ model Order {
   paystackReference String?
   phoneNumber       String?
   ticketCode        String?
+  // Delivery Location Fields
+  deliveryAddress   String?
+  deliveryLat       Float?
+  deliveryLng       Float?
+  
   restaurant        Restaurant     @relation(fields: [restaurantId], references: [id])
   user              User?          @relation(fields: [userId], references: [id])
   items             OrderItem[]
