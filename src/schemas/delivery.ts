@@ -29,7 +29,7 @@ export const rateDeliverySchema = z.object({
 });
 
 export const courierProfileSchema = z.object({
-    vehicleType: z.enum(['MOTORBIKE', 'CAR', 'BICYCLE']).optional(),
+    vehicleType: z.enum(['MOTORBIKE', 'MOTORCYCLE', 'CAR', 'BICYCLE']).optional(),
     licensePlate: z.string().optional(),
 });
 

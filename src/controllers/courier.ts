@@ -11,6 +11,7 @@ export const registerCourier = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user!.userId;
         const data = courierProfileSchema.parse(req.body);
+        const normalizedVehicleType = data.vehicleType === 'MOTORCYCLE' ? 'MOTORBIKE' : data.vehicleType;
 
         // Check if profile already exists
         const existing = await prisma.courierProfile.findUnique({ where: { userId } });
@@ -22,7 +23,7 @@ export const registerCourier = async (req: AuthRequest, res: Response) => {
         const profile = await prisma.courierProfile.create({
             data: {
                 userId,
-                vehicleType: data.vehicleType || 'MOTORBIKE',
+                vehicleType: normalizedVehicleType || 'MOTORBIKE',
                 licensePlate: data.licensePlate,
             },
         });
