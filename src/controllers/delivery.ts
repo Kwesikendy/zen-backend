@@ -264,7 +264,11 @@ export const trackDelivery = async (req: AuthRequest, res: Response) => {
                 status: true,
                 trackingCode: true,
                 pickupAddress: true,
+                pickupLat: true,
+                pickupLng: true,
                 dropoffAddress: true,
+                dropoffLat: true,
+                dropoffLng: true,
                 receiverName: true,
                 createdAt: true,
                 pickedUpAt: true,
@@ -279,6 +283,108 @@ export const trackDelivery = async (req: AuthRequest, res: Response) => {
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
+};
+
+// GET /deliveries/track/:trackingCode/live  (public tracking web page)
+export const liveTrackingPage = async (req: AuthRequest, res: Response) => {
+    const { trackingCode } = req.params;
+    const safeCode = trackingCode.replace(/[^A-Za-z0-9-]/g, '');
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Zenran Live Tracking</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; background:#f3f5f7; color:#1f2937; }
+    .top { background: linear-gradient(135deg,#FF6B35,#E8451E); color:#fff; padding:16px; }
+    .title { font-size:18px; font-weight:800; }
+    .sub { opacity:.9; font-size:13px; margin-top:4px; }
+    .card { margin:12px; background:#fff; border-radius:14px; padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+    .status { font-size:16px; font-weight:700; margin-bottom:8px; }
+    .row { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:#6b7280; }
+    #map { height:360px; border-radius:14px; overflow:hidden; }
+    .pill { display:inline-block; margin-top:8px; font-size:12px; color:#374151; background:#f3f4f6; border-radius:999px; padding:6px 10px; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">Zenran Delivery Tracking</div>
+    <div class="sub">Tracking code: ${safeCode}</div>
+  </div>
+
+  <div class="card">
+    <div id="status" class="status">Loading...</div>
+    <div class="row"><span>Courier</span><span id="courier">Assigning...</span></div>
+    <div class="row"><span>Pickup</span><span id="pickup">-</span></div>
+    <div class="row"><span>Dropoff</span><span id="dropoff">-</span></div>
+    <div class="pill" id="updatedAt">Waiting for updates...</div>
+  </div>
+
+  <div class="card"><div id="map"></div></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const trackingCode = ${JSON.stringify(safeCode)};
+    const map = L.map('map').setView([5.6037, -0.1870], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let pickupMarker = null;
+    let dropoffMarker = null;
+    let courierMarker = null;
+
+    const statusEl = document.getElementById('status');
+    const courierEl = document.getElementById('courier');
+    const pickupEl = document.getElementById('pickup');
+    const dropoffEl = document.getElementById('dropoff');
+    const updatedAtEl = document.getElementById('updatedAt');
+
+    async function refresh() {
+      try {
+        const res = await fetch('/deliveries/track/' + encodeURIComponent(trackingCode));
+        if (!res.ok) throw new Error('Not found');
+        const data = await res.json();
+
+        statusEl.textContent = 'Status: ' + String(data.status || 'UNKNOWN').replaceAll('_', ' ');
+        courierEl.textContent = data.courier?.name || 'Not assigned';
+        pickupEl.textContent = data.pickupAddress || '-';
+        dropoffEl.textContent = data.dropoffAddress || '-';
+
+        if (data.pickupLat && data.pickupLng) {
+          if (!pickupMarker) pickupMarker = L.marker([data.pickupLat, data.pickupLng]).addTo(map).bindPopup('Pickup');
+          else pickupMarker.setLatLng([data.pickupLat, data.pickupLng]);
+        }
+
+        if (data.dropoffLat && data.dropoffLng) {
+          if (!dropoffMarker) dropoffMarker = L.marker([data.dropoffLat, data.dropoffLng]).addTo(map).bindPopup('Dropoff');
+          else dropoffMarker.setLatLng([data.dropoffLat, data.dropoffLng]);
+        }
+
+        const loc = data.trackingPoints && data.trackingPoints[0];
+        if (loc && loc.lat && loc.lng) {
+          if (!courierMarker) courierMarker = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup('Courier');
+          else courierMarker.setLatLng([loc.lat, loc.lng]);
+          map.setView([loc.lat, loc.lng], 14);
+          updatedAtEl.textContent = 'Live location updated: ' + new Date(loc.createdAt).toLocaleTimeString();
+        } else {
+          updatedAtEl.textContent = 'Waiting for courier live location...';
+        }
+      } catch {
+        statusEl.textContent = 'Tracking unavailable';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 8000);
+  </script>
+</body>
+</html>`);
 };
 
 // POST /deliveries/:id/rate

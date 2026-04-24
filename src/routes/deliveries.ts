@@ -8,6 +8,7 @@ import {
     acceptDelivery,
     updateDeliveryStatus,
     trackDelivery,
+    liveTrackingPage,
     rateDelivery,
 } from '../controllers/delivery';
 
@@ -15,6 +16,7 @@ const router = express.Router();
 
 // Public route - track by code (no auth needed)
 router.get('/track/:trackingCode', trackDelivery as any);
+router.get('/track/:trackingCode/live', liveTrackingPage as any);
 
 // All other routes require auth
 router.use(authenticateToken);
