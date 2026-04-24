@@ -17,11 +17,14 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   pushToken     String?
-  orders        Order[]
-  refreshTokens RefreshToken[]
-  restaurants   Restaurant[]
-  payouts       VendorPayout[]
-  adminActions  AdminAction[]
+  orders          Order[]
+  refreshTokens   RefreshToken[]
+  restaurants     Restaurant[]
+  payouts         VendorPayout[]
+  adminActions    AdminAction[]
+  courierProfile  CourierProfile?
+  sentDeliveries  Delivery[]       @relation("sender")
+  courierDeliveries Delivery[]     @relation("courier")
 }
 
 model RefreshToken {
@@ -41,6 +44,8 @@ model Restaurant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   phone     String?
+  latitude  Float?   @default(5.6037)  // Default: Accra, Ghana
+  longitude Float?   @default(-0.1870)
   menus     Menu[]
   orders    Order[]
   owner     User?    @relation(fields: [ownerId], references: [id])
@@ -158,6 +163,7 @@ enum Role {
   USER
   ADMIN
   OWNER
+  COURIER
 }
 
 enum OrderStatus {
@@ -251,4 +257,110 @@ enum PayoutStatus {
   PENDING
   PAID
   FAILED
+}
+
+// ─── Delivery Feature ───────────────────────────────────────
+
+model CourierProfile {
+  id            String        @id @default(uuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id])
+  vehicleType   VehicleType   @default(MOTORBIKE)
+  licensePlate  String?
+  isOnline      Boolean       @default(false)
+  isApproved    Boolean       @default(false)
+  currentLat    Float?
+  currentLng    Float?
+  rating        Float         @default(5.0)
+  totalDeliveries Int         @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([isOnline, isApproved])
+}
+
+model Delivery {
+  id              String           @id @default(uuid())
+  senderId        String
+  sender          User             @relation("sender", fields: [senderId], references: [id])
+  courierId       String?
+  courier         User?            @relation("courier", fields: [courierId], references: [id])
+  
+  // Package Info
+  packageDesc     String
+  packagePhoto    String?
+  
+  // Pickup
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+  pickupPhone     String
+  
+  // Dropoff
+  dropoffAddress  String
+  dropoffLat      Float
+  dropoffLng      Float
+  receiverName    String
+  receiverPhone   String
+  
+  // Pricing & Payment
+  distanceKm      Float
+  price           Decimal          @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod    @default(CASH)
+  paymentStatus   PaymentStatus    @default(PENDING)
+  paystackRef     String?
+  
+  // Status & Scheduling
+  status          DeliveryStatus   @default(REQUESTED)
+  scheduledAt     DateTime?
+  pickedUpAt      DateTime?
+  deliveredAt     DateTime?
+  cancelReason    String?
+  
+  // Tracking
+  trackingCode    String           @unique
+  
+  // Rating
+  rating          Int?
+  ratingComment   String?
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  trackingPoints  DeliveryTracking[]
+
+  @@index([senderId])
+  @@index([courierId])
+  @@index([status])
+  @@index([trackingCode])
+  @@index([createdAt])
+}
+
+model DeliveryTracking {
+  id          String   @id @default(uuid())
+  deliveryId  String
+  delivery    Delivery @relation(fields: [deliveryId], references: [id])
+  lat         Float
+  lng         Float
+  createdAt   DateTime @default(now())
+
+  @@index([deliveryId])
+  @@index([createdAt])
+}
+
+enum DeliveryStatus {
+  REQUESTED
+  ACCEPTED
+  ARRIVED_PICKUP
+  PICKED_UP
+  IN_TRANSIT
+  ARRIVED_DROPOFF
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum VehicleType {
+  MOTORBIKE
+  CAR
+  BICYCLE
 }

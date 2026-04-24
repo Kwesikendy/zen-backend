@@ -14,6 +14,8 @@ import adminRoutes from './routes/admin';
 import adminFinanceRoutes from './routes/adminFinance';
 import adminContentRoutes from './routes/adminContent';
 import paymentRoutes from './routes/payment';
+import deliveryRoutes from './routes/deliveries';
+import courierRoutes from './routes/couriers';
 
 export const createApp = () => {
     const app = express();
@@ -33,6 +35,8 @@ export const createApp = () => {
     app.use('/admin', adminFinanceRoutes);
     app.use('/admin', adminContentRoutes);
     app.use('/payment', paymentRoutes);
+    app.use('/deliveries', deliveryRoutes);
+    app.use('/couriers', courierRoutes);
     app.get('/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
     return app;
 };

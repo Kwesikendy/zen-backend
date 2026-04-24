@@ -26,6 +26,12 @@ export const initSocket = (httpServer: HttpServer) => {
             socket.join(`user_${userId}`);
         });
 
+        // Join delivery room (for live tracking)
+        socket.on('joinDelivery', (deliveryId: string) => {
+            console.log(`Socket ${socket.id} joining delivery ${deliveryId}`);
+            socket.join(`delivery_${deliveryId}`);
+        });
+
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
         });
@@ -50,5 +56,11 @@ export const emitToRestaurant = (restaurantId: string, event: string, data: any)
 export const emitToUser = (userId: string, event: string, data: any) => {
     if (io) {
         io.to(`user_${userId}`).emit(event, data);
+    }
+};
+
+export const emitToDelivery = (deliveryId: string, event: string, data: any) => {
+    if (io) {
+        io.to(`delivery_${deliveryId}`).emit(event, data);
     }
 };
