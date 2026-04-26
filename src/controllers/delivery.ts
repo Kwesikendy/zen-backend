@@ -4,10 +4,11 @@ import { AuthRequest } from '../middleware/auth';
 import { createDeliverySchema, updateDeliveryStatusSchema, rateDeliverySchema } from '../schemas/delivery';
 import { emitToUser, emitToDelivery } from '../services/socket';
 import { sendSMS } from '../services/notification';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
 
-// Haversine distance in km
+// Haversine distance in km (fallback)
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -16,6 +17,32 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Road distance via Google Maps Directions API, falls back to haversine
+async function getRoadDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): Promise<{ distanceKm: number; durationMin: number; source: 'google' | 'haversine' }> {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (apiKey) {
+        try {
+            const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${lat1},${lng1}&destination=${lat2},${lng2}&mode=driving&key=${apiKey}`;
+            const { data } = await axios.get(url, { timeout: 5000 });
+            if (data.status === 'OK' && data.routes?.[0]?.legs?.[0]) {
+                const leg = data.routes[0].legs[0];
+                return {
+                    distanceKm: leg.distance.value / 1000,
+                    durationMin: Math.ceil(leg.duration.value / 60),
+                    source: 'google',
+                };
+            }
+        } catch (_) {
+            // fall through to haversine
+        }
+    }
+    return {
+        distanceKm: haversineKm(lat1, lng1, lat2, lng2),
+        durationMin: 0,
+        source: 'haversine',
+    };
 }
 
 // Zone-based pricing (GHS)
@@ -49,10 +76,15 @@ export const getPriceEstimate = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'All coordinates are required' });
         }
 
-        const distanceKm = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+        const { distanceKm, durationMin, source } = await getRoadDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
         const price = calculatePrice(distanceKm);
 
-        res.json({ distanceKm: Math.round(distanceKm * 10) / 10, price });
+        res.json({
+            distanceKm: Math.round(distanceKm * 10) / 10,
+            durationMin,
+            price,
+            source,
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
