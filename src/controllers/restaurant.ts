@@ -14,8 +14,9 @@ export const createRestaurant = async (req: AuthRequest, res: Response) => {
             data: {
                 name: validatedData.name,
                 address: validatedData.address || '',
-                phone: validatedData.phone, // Prisma schema doesn't have phone, need to check
+                phone: validatedData.phone,
                 ownerId: userId,
+                isVisible: true,
             },
         });
 
