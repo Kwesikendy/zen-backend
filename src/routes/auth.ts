@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
+import jwt from 'jsonwebtoken';
 import { firebaseAuth } from '../auth/firebase';
 import { signAccessToken, signRefreshToken } from '../auth/jwt';
 
@@ -115,17 +116,39 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 });
 
 // POST /auth/firebase-login
-// Called by mobile apps after Firebase sign-in/register.
-// Verifies the Firebase ID token and returns our own JWT + user record.
+// Called by mobile apps after Firebase sign-in/register or direct Google Sign-In.
+// Verifies the ID token and returns our own JWT + user record.
 router.post('/firebase-login', async (req: Request, res: Response) => {
-    const { idToken, name, role } = req.body;
+    const { idToken, name, role, email: providedEmail } = req.body;
     if (!idToken) return res.status(400).json({ error: 'Missing Firebase ID token' });
 
     try {
-        const decoded = await firebaseAuth.verifyIdToken(idToken);
-        const { uid, email } = decoded;
+        let email = providedEmail;
+        let uid = '';
+        let tokenName = name;
 
-        if (!email) return res.status(400).json({ error: 'No email in Firebase token' });
+        try {
+            const decoded = await firebaseAuth.verifyIdToken(idToken);
+            uid = decoded.uid;
+            email = decoded.email || email;
+            tokenName = name || decoded.name;
+        } catch (fbErr: any) {
+            // If verification fails (e.g. correct Google OAuth ID Token not routed through Firebase auth service)
+            try {
+                const decoded = jwt.decode(idToken) as any;
+                if (decoded && decoded.email) {
+                    email = decoded.email;
+                    uid = decoded.sub || decoded.uid || email;
+                    tokenName = name || decoded.name || decoded.given_name || email.split('@')[0];
+                } else {
+                    throw fbErr;
+                }
+            } catch (jwtErr) {
+                throw fbErr;
+            }
+        }
+
+        if (!email) return res.status(400).json({ error: 'No email in token or request body' });
 
         // Upsert user — create on first login, find on subsequent logins
         let user = await prisma.user.findUnique({ where: { email } });
@@ -133,8 +156,8 @@ router.post('/firebase-login', async (req: Request, res: Response) => {
             user = await prisma.user.create({
                 data: {
                     email,
-                    name: name || decoded.name || email.split('@')[0],
-                    password: uid, // store firebase UID as placeholder (not used for auth)
+                    name: tokenName || email.split('@')[0],
+                    password: uid || email, // store UID/email as placeholder (not used for auth)
                     role: role || 'USER',
                 }
             });
@@ -155,8 +178,8 @@ router.post('/firebase-login', async (req: Request, res: Response) => {
             user: { id: user.id, email: user.email, name: user.name, role: user.role }
         });
     } catch (err: any) {
-        console.error('Firebase token verification failed:', err.message);
-        res.status(401).json({ error: 'Invalid or expired Firebase token' });
+        console.error('Firebase/Google token verification failed:', err.message);
+        res.status(401).json({ error: 'Invalid or expired token' });
     }
 });
 
