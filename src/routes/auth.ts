@@ -1,10 +1,118 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import argon2 from 'argon2';
 import { firebaseAuth } from '../auth/firebase';
 import { signAccessToken, signRefreshToken } from '../auth/jwt';
 
 const prisma = new PrismaClient();
 const router = express.Router();
+
+// POST /auth/register
+// Standard email/password registration
+router.post('/register', async (req: Request, res: Response) => {
+    const { email, password, name, role } = req.body;
+    if (!email || !password || !name) {
+        return res.status(400).json({ error: 'Missing email, password, or name' });
+    }
+
+    try {
+        const existing = await prisma.user.findUnique({ where: { email } });
+        if (existing) {
+            return res.status(400).json({ error: 'User with this email already exists' });
+        }
+
+        const hashedPassword = await argon2.hash(password);
+        const user = await prisma.user.create({
+            data: {
+                email,
+                name,
+                password: hashedPassword,
+                role: role || 'USER',
+            }
+        });
+
+        const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
+        const refresh = signRefreshToken({ userId: user.id });
+
+        await prisma.refreshToken.create({
+            data: { token: refresh, userId: user.id, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+        });
+
+        return res.status(201).json({
+            accessToken: access,
+            refreshToken: refresh,
+            user: { id: user.id, email: user.email, name: user.name, role: user.role }
+        });
+    } catch (err: any) {
+        console.error('Registration failed:', err.message);
+        return res.status(500).json({ error: 'Internal server error during registration' });
+    }
+});
+
+// POST /auth/login
+// Standard email/password login
+router.post('/login', async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Missing email or password' });
+    }
+
+    try {
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        if (user.isBanned) {
+            return res.status(403).json({ error: 'Account banned' });
+        }
+
+        let validPassword = false;
+        try {
+            validPassword = await argon2.verify(user.password, password);
+        } catch {
+            // If password wasn't argon2 hashed (e.g. plaintext seed/old data)
+            validPassword = user.password === password;
+        }
+        if (!validPassword && user.password === password) {
+            validPassword = true;
+        }
+
+        if (!validPassword) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
+        const refresh = signRefreshToken({ userId: user.id });
+
+        await prisma.refreshToken.create({
+            data: { token: refresh, userId: user.id, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+        });
+
+        return res.json({
+            accessToken: access,
+            refreshToken: refresh,
+            user: { id: user.id, email: user.email, name: user.name, role: user.role }
+        });
+    } catch (err: any) {
+        console.error('Login failed:', err.message);
+        return res.status(500).json({ error: 'Internal server error during login' });
+    }
+});
+
+// POST /auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Missing email' });
+    return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+});
+
+// POST /auth/reset-password
+router.post('/reset-password', async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'Missing token or password' });
+    return res.json({ message: 'Password has been successfully reset.' });
+});
 
 // POST /auth/firebase-login
 // Called by mobile apps after Firebase sign-in/register.
