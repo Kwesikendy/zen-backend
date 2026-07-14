@@ -63,7 +63,12 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
                 totalOrders: 0,
                 todaysRevenue: 0,
                 todaysOrders: 0,
-                recentOrders: []
+                balanceDue: 0,
+                totalEarnings: 0,
+                totalPaidOut: 0,
+                statusBreakdown: [],
+                topItems: [],
+                recentCustomers: []
             });
         }
 
