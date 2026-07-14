@@ -8,7 +8,7 @@ async function resetAdmin() {
         const email = 'admin@zenran.com';
         const password = 'password123';
 
-        console.log(`🗑️  Deleting existing admin user: ${email}...`);
+        console.log(`  Deleting existing admin user: ${email}...`);
 
         // Find user first to get ID
         const existingUser = await prisma.user.findUnique({

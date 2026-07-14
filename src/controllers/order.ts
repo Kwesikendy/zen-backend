@@ -84,9 +84,15 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             // Use a dummy email if user is anonymous, or user's email
             const email = req.user?.email || `customer-${phoneNumber}@zenran.com`;
 
-            // Initialize Paystack
+            // Fetch restaurant to check if Option B Subaccount Split is active
+            const restaurantInfo = await prisma.restaurant.findUnique({
+                where: { id: restaurantId },
+                select: { paystackSubaccountCode: true }
+            });
+
+            // Initialize Paystack with Option B subaccount (if present)
             const reference = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            paystackData = await initializeTransaction(email, total, reference);
+            paystackData = await initializeTransaction(email, total, reference, restaurantInfo?.paystackSubaccountCode);
         } else {
             // Cash orders are PENDING payment until confirmed by vendor, or we can mark as PENDING
             paymentStatus = 'PENDING';

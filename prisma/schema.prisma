@@ -68,6 +68,12 @@ model Restaurant {
   rejectionReason String?
   isVisible       Boolean   @default(true) // Admin toggle for visibility
 
+  // Option B: Paystack Subaccount Split Payment Integration
+  paystackSubaccountCode String? // E.g. ACCT_xxxxxxxxxxx
+  paystackCommissionPct  Float?  @default(15.0) // Platform commission percentage (15%)
+  momoNetwork            String? // MTN, VODAFONE, AIRTELTIGO
+  momoNumber             String? // Vendor MoMo number for subaccount payouts
+
   @@index([ownerId])
 }
 

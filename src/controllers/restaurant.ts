@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { createRestaurantSchema, updateRestaurantSchema } from '../schemas/restaurant';
+import { createPaystackSubaccount } from '../services/payment';
 
 const prisma = new PrismaClient();
 
@@ -110,5 +111,40 @@ export const getRestaurant = async (req: AuthRequest, res: Response) => {
         res.json(restaurant);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+// Option B: Setup Paystack Subaccount for Instant Split Payments at Checkout
+export const setupPaystackSubaccount = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user!.userId;
+        const { settlementBank, accountNumber, percentageCharge } = req.body; // e.g. settlementBank: "MTN", accountNumber: "0241234567", percentageCharge: 15
+
+        const existing = await prisma.restaurant.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Restaurant not found' });
+        if (existing.ownerId !== userId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // Call Paystack API to create subaccount
+        const subaccount = await createPaystackSubaccount(
+            existing.name,
+            settlementBank || 'MTN',
+            accountNumber,
+            percentageCharge || 15
+        );
+
+        const updated = await prisma.restaurant.update({
+            where: { id },
+            data: {
+                paystackSubaccountCode: subaccount.subaccount_code,
+                paystackCommissionPct: percentageCharge || 15,
+                momoNetwork: settlementBank || 'MTN',
+                momoNumber: accountNumber
+            }
+        });
+
+        res.json({ success: true, subaccountCode: subaccount.subaccount_code, restaurant: updated });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
     }
 };

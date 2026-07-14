@@ -206,8 +206,8 @@ export const updateDeliveryStatus = async (req: AuthRequest, res: Response) => {
         const isSender = delivery.senderId === userId;
         if (!isCourier && !isSender) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Sender can only cancel
-        if (isSender && status !== 'CANCELLED') return res.status(403).json({ error: 'You can only cancel' });
+        // Sender can only cancel (if they are not the assigned courier)
+        if (isSender && !isCourier && status !== 'CANCELLED') return res.status(403).json({ error: 'You can only cancel' });
 
         const updateData: any = { status };
 
@@ -221,8 +221,8 @@ export const updateDeliveryStatus = async (req: AuthRequest, res: Response) => {
             include: { courier: { select: { name: true } } },
         });
 
-        // Update courier stats on completion
-        if (status === 'COMPLETED' && delivery.courierId) {
+        // Update courier stats on completion or delivery
+        if ((status === 'COMPLETED' || status === 'DELIVERED') && delivery.courierId) {
             await prisma.courierProfile.update({
                 where: { userId: delivery.courierId },
                 data: { totalDeliveries: { increment: 1 } },

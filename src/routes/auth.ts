@@ -9,28 +9,38 @@ const prisma = new PrismaClient();
 const router = express.Router();
 
 // POST /auth/register
-// Standard email/password registration
+// Standard email/password registration or role/account upgrade
 router.post('/register', async (req: Request, res: Response) => {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) {
-        return res.status(400).json({ error: 'Missing email, password, or name' });
+        return res.status(400).json({ error: 'Missing email, password, or name', message: 'Missing email, password, or name' });
     }
 
     try {
+        let user;
+        const hashedPassword = await argon2.hash(password);
+
         const existing = await prisma.user.findUnique({ where: { email } });
         if (existing) {
-            return res.status(400).json({ error: 'User with this email already exists' });
+            // Update/Upgrade existing user (e.g. upgrading from USER to OWNER or linking password after social login)
+            user = await prisma.user.update({
+                where: { email },
+                data: {
+                    name: name || existing.name,
+                    password: hashedPassword,
+                    role: role ? role : existing.role,
+                }
+            });
+        } else {
+            user = await prisma.user.create({
+                data: {
+                    email,
+                    name,
+                    password: hashedPassword,
+                    role: role || 'USER',
+                }
+            });
         }
-
-        const hashedPassword = await argon2.hash(password);
-        const user = await prisma.user.create({
-            data: {
-                email,
-                name,
-                password: hashedPassword,
-                role: role || 'USER',
-            }
-        });
 
         const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
         const refresh = signRefreshToken({ userId: user.id });
@@ -39,14 +49,14 @@ router.post('/register', async (req: Request, res: Response) => {
             data: { token: refresh, userId: user.id, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
         });
 
-        return res.status(201).json({
+        return res.status(existing ? 200 : 201).json({
             accessToken: access,
             refreshToken: refresh,
             user: { id: user.id, email: user.email, name: user.name, role: user.role }
         });
     } catch (err: any) {
         console.error('Registration failed:', err.message);
-        return res.status(500).json({ error: 'Internal server error during registration' });
+        return res.status(500).json({ error: 'Internal server error during registration', message: 'Internal server error during registration' });
     }
 });
 
@@ -55,17 +65,17 @@ router.post('/register', async (req: Request, res: Response) => {
 router.post('/login', async (req: Request, res: Response) => {
     const { email, password } = req.body;
     if (!email || !password) {
-        return res.status(400).json({ error: 'Missing email or password' });
+        return res.status(400).json({ error: 'Missing email or password', message: 'Missing email or password' });
     }
 
     try {
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid email or password', message: 'Invalid email or password' });
         }
 
         if (user.isBanned) {
-            return res.status(403).json({ error: 'Account banned' });
+            return res.status(403).json({ error: 'Account banned', message: 'Account banned' });
         }
 
         let validPassword = false;
@@ -80,7 +90,7 @@ router.post('/login', async (req: Request, res: Response) => {
         }
 
         if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid email or password', message: 'Invalid email or password' });
         }
 
         const access = signAccessToken({ userId: user.id, role: user.role, email: user.email });
@@ -97,7 +107,7 @@ router.post('/login', async (req: Request, res: Response) => {
         });
     } catch (err: any) {
         console.error('Login failed:', err.message);
-        return res.status(500).json({ error: 'Internal server error during login' });
+        return res.status(500).json({ error: 'Internal server error during login', message: 'Internal server error during login' });
     }
 });
 

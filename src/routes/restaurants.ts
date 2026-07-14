@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { createRestaurant, getMyRestaurants, getAllRestaurants, updateRestaurant, deleteRestaurant, getRestaurant } from '../controllers/restaurant';
+import { createRestaurant, getMyRestaurants, getAllRestaurants, updateRestaurant, deleteRestaurant, getRestaurant, setupPaystackSubaccount } from '../controllers/restaurant';
 
 const router = express.Router();
 
@@ -13,6 +13,7 @@ router.use(authenticateToken);
 router.post('/', createRestaurant);
 router.get('/', getMyRestaurants);
 router.put('/:id', updateRestaurant);
+router.post('/:id/subaccount', setupPaystackSubaccount);
 router.delete('/:id', deleteRestaurant);
 
 export default router;
