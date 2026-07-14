@@ -71,19 +71,56 @@ export const getPriceEstimate = async (req: AuthRequest, res: Response) => {
         const pickupLng = parseFloat(req.query.pickupLng as string);
         const dropoffLat = parseFloat(req.query.dropoffLat as string);
         const dropoffLng = parseFloat(req.query.dropoffLng as string);
+        const stopsQuery = req.query.stops as string;
 
-        if ([pickupLat, pickupLng, dropoffLat, dropoffLng].some(isNaN)) {
-            return res.status(400).json({ error: 'All coordinates are required' });
+        if (isNaN(pickupLat) || isNaN(pickupLng)) {
+            return res.status(400).json({ error: 'Pickup coordinates are required' });
         }
 
-        const { distanceKm, durationMin, source } = await getRoadDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-        const price = calculatePrice(distanceKm);
+        let totalDistanceKm = 0;
+        let totalDurationMin = 0;
+        let stopsCount = 1;
+
+        if (stopsQuery) {
+            try {
+                const parsedStops = JSON.parse(stopsQuery);
+                if (Array.isArray(parsedStops) && parsedStops.length > 0) {
+                    stopsCount = parsedStops.length;
+                    let currLat = pickupLat;
+                    let currLng = pickupLng;
+                    for (const s of parsedStops) {
+                        const { distanceKm, durationMin } = await getRoadDistanceKm(currLat, currLng, Number(s.lat || s.dropoffLat), Number(s.lng || s.dropoffLng));
+                        totalDistanceKm += distanceKm;
+                        totalDurationMin += durationMin;
+                        currLat = Number(s.lat || s.dropoffLat);
+                        currLng = Number(s.lng || s.dropoffLng);
+                    }
+                }
+            } catch (_) {
+                // Ignore parse errors, fall through to dropoffLat check
+            }
+        }
+
+        if (totalDistanceKm === 0) {
+            if (isNaN(dropoffLat) || isNaN(dropoffLng)) {
+                return res.status(400).json({ error: 'Dropoff coordinates are required' });
+            }
+            const { distanceKm, durationMin } = await getRoadDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+            totalDistanceKm = distanceKm;
+            totalDurationMin = durationMin;
+        }
+
+        let price = calculatePrice(totalDistanceKm);
+        if (stopsCount > 1) {
+            price = price + (stopsCount - 1) * 10;
+        }
 
         res.json({
-            distanceKm: Math.round(distanceKm * 10) / 10,
-            durationMin,
-            price,
-            source,
+            distanceKm: Math.round(totalDistanceKm * 10) / 10,
+            durationMin: totalDurationMin,
+            price: Math.round(price * 100) / 100,
+            stopsCount,
+            source: 'google',
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -96,8 +133,23 @@ export const createDelivery = async (req: AuthRequest, res: Response) => {
         const data = createDeliverySchema.parse(req.body);
         const senderId = req.user!.userId;
 
-        const distanceKm = haversineKm(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
-        const price = calculatePrice(distanceKm);
+        let totalDistanceKm = 0;
+        let price = 0;
+        const isBulk = Boolean(data.isBulk && data.stops && data.stops.length > 0);
+
+        if (isBulk && data.stops && data.stops.length > 0) {
+            let currLat = data.pickupLat;
+            let currLng = data.pickupLng;
+            for (const s of data.stops) {
+                totalDistanceKm += haversineKm(currLat, currLng, s.dropoffLat, s.dropoffLng);
+                currLat = s.dropoffLat;
+                currLng = s.dropoffLng;
+            }
+            price = calculatePrice(totalDistanceKm) + (data.stops.length - 1) * 10;
+        } else {
+            totalDistanceKm = haversineKm(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
+            price = calculatePrice(totalDistanceKm);
+        }
 
         // Generate unique tracking code
         let trackingCode = generateTrackingCode();
@@ -107,24 +159,27 @@ export const createDelivery = async (req: AuthRequest, res: Response) => {
             exists = await prisma.delivery.findUnique({ where: { trackingCode } });
         }
 
+        const firstStop = (isBulk && data.stops && data.stops.length > 0) ? data.stops[0] : null;
         const delivery = await prisma.delivery.create({
             data: {
                 senderId,
-                packageDesc: data.packageDesc,
+                packageDesc: isBulk ? (data.packageDesc || `Bulk Dispatch (${data.stops!.length} stops)`) : data.packageDesc,
                 pickupAddress: data.pickupAddress,
                 pickupLat: data.pickupLat,
                 pickupLng: data.pickupLng,
                 pickupPhone: data.pickupPhone,
-                dropoffAddress: data.dropoffAddress,
-                dropoffLat: data.dropoffLat,
-                dropoffLng: data.dropoffLng,
-                receiverName: data.receiverName,
-                receiverPhone: data.receiverPhone,
-                distanceKm: Math.round(distanceKm * 10) / 10,
-                price,
+                dropoffAddress: isBulk && firstStop ? firstStop.dropoffAddress : data.dropoffAddress,
+                dropoffLat: isBulk && firstStop ? firstStop.dropoffLat : data.dropoffLat,
+                dropoffLng: isBulk && firstStop ? firstStop.dropoffLng : data.dropoffLng,
+                receiverName: isBulk && firstStop ? (data.receiverName || firstStop.receiverName || `Bulk (${data.stops!.length} Receivers)`) : data.receiverName,
+                receiverPhone: isBulk && firstStop ? (data.receiverPhone || firstStop.receiverPhone || data.pickupPhone) : data.receiverPhone,
+                distanceKm: Math.round(totalDistanceKm * 10) / 10,
+                price: Math.round(price * 100) / 100,
                 paymentMethod: data.paymentMethod || 'CASH',
                 trackingCode,
                 scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                isBulk,
+                stops: isBulk ? (data.stops as any) : null,
             },
         });
 

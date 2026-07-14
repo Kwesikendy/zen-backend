@@ -309,6 +309,8 @@ model Delivery {
   // Package Info
   packageDesc     String
   packagePhoto    String?
+  isBulk          Boolean          @default(false)
+  stops           Json?            // Array of stop objects for multi-stop dispatch
   
   // Pickup
   pickupAddress   String

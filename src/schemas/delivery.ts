@@ -13,6 +13,16 @@ export const createDeliverySchema = z.object({
     receiverPhone: z.string().min(9, 'Valid receiver phone is required'),
     paymentMethod: z.enum(['CASH', 'MOMO']).optional(),
     scheduledAt: z.string().datetime().optional(),
+    isBulk: z.boolean().optional(),
+    stops: z.array(z.object({
+        dropoffAddress: z.string().min(1, 'Stop address is required'),
+        dropoffLat: z.number(),
+        dropoffLng: z.number(),
+        receiverName: z.string().min(1, 'Receiver name is required'),
+        receiverPhone: z.string().min(9, 'Valid receiver phone is required'),
+        packageDesc: z.string().optional(),
+        status: z.string().optional()
+    })).optional(),
 });
 
 export const updateDeliveryStatusSchema = z.object({
