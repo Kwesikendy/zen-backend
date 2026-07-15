@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
-    "start": "npm run build && npx prisma db push --accept-data-loss && node dist/index.js",
+    "build": "npx prisma generate && node --max-old-space-size=400 ./node_modules/typescript/bin/tsc",
+    "postinstall": "npx prisma generate && node --max-old-space-size=400 ./node_modules/typescript/bin/tsc",
+    "start": "npx prisma db push --accept-data-loss && node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "lint": "eslint . --ext .ts",
