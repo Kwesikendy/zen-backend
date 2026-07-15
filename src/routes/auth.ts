@@ -195,7 +195,7 @@ router.post('/firebase-login', async (req: Request, res: Response) => {
 
 // POST /auth/refresh — keep existing refresh token flow
 router.post('/refresh', async (req: Request, res: Response) => {
-    const { refreshToken } = req.body;
+    const refreshToken = req.body.refreshToken || req.body.token;
     if (!refreshToken) return res.status(400).json({ error: 'Missing refresh token' });
 
     const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });

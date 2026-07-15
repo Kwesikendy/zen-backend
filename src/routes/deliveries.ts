@@ -14,14 +14,14 @@ import {
 
 const router = express.Router();
 
-// Public route - track by code (no auth needed)
+// Public routes (no auth needed for tracking or price estimates)
 router.get('/track/:trackingCode', trackDelivery as any);
 router.get('/track/:trackingCode/live', liveTrackingPage as any);
+router.get('/price-estimate', getPriceEstimate);
 
 // All other routes require auth
 router.use(authenticateToken);
 
-router.get('/price-estimate', getPriceEstimate);
 router.post('/', createDelivery);
 router.get('/my', getMyDeliveries);
 router.get('/:id', getDelivery);
