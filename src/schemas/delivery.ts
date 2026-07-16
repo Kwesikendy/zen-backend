@@ -42,6 +42,7 @@ export const courierProfileSchema = z.object({
     vehicleType: z.enum(['MOTORBIKE', 'MOTORCYCLE', 'CAR', 'BICYCLE']).optional(),
     licensePlate: z.string().optional(),
     phone: z.string().optional(),
+    phoneNumber: z.string().optional(),
 });
 
 export const updateLocationSchema = z.object({

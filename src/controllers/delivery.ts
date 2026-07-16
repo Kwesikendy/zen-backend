@@ -235,7 +235,7 @@ export const acceptDelivery = async (req: AuthRequest, res: Response) => {
         const updated = await prisma.delivery.update({
             where: { id },
             data: { courierId, status: 'ACCEPTED' },
-            include: { courier: { select: { id: true, name: true, phone: true } } },
+            include: { courier: { select: { id: true, name: true, phone: true, courierProfile: { select: { phone: true, vehicleType: true, licensePlate: true } } } } },
         });
 
         // Notify sender
@@ -278,7 +278,7 @@ export const updateDeliveryStatus = async (req: AuthRequest, res: Response) => {
         const updated = await prisma.delivery.update({
             where: { id },
             data: updateData,
-            include: { courier: { select: { id: true, name: true, phone: true } } },
+            include: { courier: { select: { id: true, name: true, phone: true, courierProfile: { select: { phone: true, vehicleType: true, licensePlate: true } } } } },
         });
 
         // Update courier stats on completion or delivery
@@ -311,7 +311,7 @@ export const getMyDeliveries = async (req: AuthRequest, res: Response) => {
         const userId = req.user!.userId;
         const deliveries = await prisma.delivery.findMany({
             where: { senderId: userId },
-            include: { courier: { select: { id: true, name: true, phone: true } } },
+            include: { courier: { select: { id: true, name: true, phone: true, courierProfile: { select: { phone: true, vehicleType: true, licensePlate: true } } } } },
             orderBy: { createdAt: 'desc' },
         });
         res.json(deliveries);
@@ -329,7 +329,7 @@ export const getDelivery = async (req: AuthRequest, res: Response) => {
         const delivery = await prisma.delivery.findUnique({
             where: { id },
             include: {
-                courier: { select: { id: true, name: true, phone: true } },
+                courier: { select: { id: true, name: true, phone: true, courierProfile: { select: { phone: true, vehicleType: true, licensePlate: true } } } },
                 trackingPoints: { orderBy: { createdAt: 'desc' }, take: 1 },
             },
         });
@@ -365,7 +365,7 @@ export const trackDelivery = async (req: AuthRequest, res: Response) => {
                 createdAt: true,
                 pickedUpAt: true,
                 deliveredAt: true,
-                courier: { select: { id: true, name: true, phone: true } },
+                courier: { select: { id: true, name: true, phone: true, courierProfile: { select: { phone: true, vehicleType: true, licensePlate: true } } } },
                 trackingPoints: { orderBy: { createdAt: 'desc' }, take: 1 },
             },
         });
