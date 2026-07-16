@@ -17,8 +17,14 @@ export const registerCourier = async (req: AuthRequest, res: Response) => {
         const existing = await prisma.courierProfile.findUnique({ where: { userId } });
         if (existing) return res.status(400).json({ error: 'Courier profile already exists' });
 
-        // Update user role to COURIER
-        await prisma.user.update({ where: { id: userId }, data: { role: 'COURIER' } });
+        // Update user role to COURIER (and phone if provided)
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                role: 'COURIER',
+                ...(data.phone ? { phone: data.phone } : {})
+            }
+        });
 
         const profile = await prisma.courierProfile.create({
             data: {
@@ -40,7 +46,7 @@ export const getCourierProfile = async (req: AuthRequest, res: Response) => {
         const userId = req.user!.userId;
         const profile = await prisma.courierProfile.findUnique({
             where: { userId },
-            include: { user: { select: { name: true, email: true } } },
+            include: { user: { select: { name: true, email: true, phone: true } } },
         });
 
         if (!profile) return res.status(404).json({ error: 'Courier profile not found' });

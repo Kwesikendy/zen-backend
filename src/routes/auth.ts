@@ -11,7 +11,7 @@ const router = express.Router();
 // POST /auth/register
 // Standard email/password registration or role/account upgrade
 router.post('/register', async (req: Request, res: Response) => {
-    const { email, password, name, role } = req.body;
+    const { email, password, name, role, phone } = req.body;
     if (!email || !password || !name) {
         return res.status(400).json({ error: 'Missing email, password, or name', message: 'Missing email, password, or name' });
     }
@@ -29,6 +29,7 @@ router.post('/register', async (req: Request, res: Response) => {
                     name: name || existing.name,
                     password: hashedPassword,
                     role: role ? role : existing.role,
+                    ...(phone ? { phone } : {}),
                 }
             });
         } else {
@@ -36,6 +37,7 @@ router.post('/register', async (req: Request, res: Response) => {
                 data: {
                     email,
                     name,
+                    phone: phone || null,
                     password: hashedPassword,
                     role: role || 'USER',
                 }
