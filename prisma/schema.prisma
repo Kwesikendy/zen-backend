@@ -17,6 +17,7 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   pushToken     String?
+  phone         String?
   orders          Order[]
   refreshTokens   RefreshToken[]
   restaurants     Restaurant[]
@@ -287,6 +288,7 @@ model CourierProfile {
   user          User          @relation(fields: [userId], references: [id])
   vehicleType   VehicleType   @default(MOTORBIKE)
   licensePlate  String?
+  phone         String?
   isOnline      Boolean       @default(false)
   isApproved    Boolean       @default(false)
   currentLat    Float?

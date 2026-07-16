@@ -242,7 +242,7 @@ export const acceptDelivery = async (req: AuthRequest, res: Response) => {
         emitToUser(delivery.senderId, 'DELIVERY_STATUS_UPDATE', updated);
         emitToDelivery(id, 'DELIVERY_STATUS_UPDATE', updated);
 
-        const courierName = updated.courier?.name || 'A courier';
+        const courierName = (updated as any).courier?.name || 'A courier';
         await sendSMS(delivery.pickupPhone, `${courierName} is on the way to pick up your package (${delivery.trackingCode}).`);
 
         res.json(updated);
