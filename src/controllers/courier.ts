@@ -153,7 +153,7 @@ export const getCourierEarnings = async (req: AuthRequest, res: Response) => {
 
         // Calculate earnings from completed deliveries
         const completed = await prisma.delivery.findMany({
-            where: { courierId: userId, status: 'COMPLETED' },
+            where: { courierId: userId, status: { in: ['COMPLETED', 'DELIVERED'] } },
             select: { price: true, createdAt: true },
             orderBy: { createdAt: 'desc' },
         });

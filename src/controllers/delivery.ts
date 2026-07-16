@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { ZodError } from 'zod';
 import { AuthRequest } from '../middleware/auth';
 import { createDeliverySchema, updateDeliveryStatusSchema, rateDeliverySchema } from '../schemas/delivery';
 import { emitToUser, emitToDelivery } from '../services/socket';
@@ -209,7 +210,11 @@ export const createDelivery = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json(delivery);
     } catch (error: any) {
-        res.status(400).json({ error: error.message });
+        if (error instanceof ZodError || error.name === 'ZodError') {
+            const firstIssue = error.errors?.[0]?.message || error.issues?.[0]?.message || error.message;
+            return res.status(400).json({ error: firstIssue });
+        }
+        res.status(400).json({ error: error.message || 'Could not create package delivery request.' });
     }
 };
 
